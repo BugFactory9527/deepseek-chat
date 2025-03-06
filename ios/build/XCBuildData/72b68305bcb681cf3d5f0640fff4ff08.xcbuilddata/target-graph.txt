@@ -1,0 +1,4 @@
+Target dependency graph (2 targets)
+Target 'Runner' in project 'Runner'
+➜ Implicit dependency on target 'Pods-Runner' in project 'Pods' via file 'Pods_Runner.framework' in build phase 'Link Binary'
+Target 'Pods-Runner' in project 'Pods' (no dependencies)
