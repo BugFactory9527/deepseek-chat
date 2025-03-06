@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
 import 'chat_message.dart';
-import 'deepseek_client.dart';
 import 'config.dart';
+import 'deepseek_client.dart';
 
 void main() {
   runApp(const MyApp());
@@ -140,29 +143,43 @@ class _ChatScreenState extends State<ChatScreen> {
     _conversationHistory.add({'role': 'user', 'content': text});
 
     try {
-      // 调用 DeepSeek API
-      final response = await _deepSeekClient.chatCompletion(
-        text,
-        systemMessages: _conversationHistory
-            .where((msg) => msg['role'] == 'system')
-            .toList(),
-      );
+      // 创建一个流控制器，用于流式接收AI回复
+      final streamController = StreamController<String>();
 
-      if (!mounted) return;
-
-      // 添加 AI 回复到界面
+      // 先添加一个空的AI消息，稍后会通过流更新
       setState(() {
         _isTyping = false;
         _messages.add(ChatMessage(
-          text: response,
+          text: "", // 初始为空
           isAI: true,
+          streamController: streamController, // 传入流控制器
         ));
       });
 
-      // 添加 AI 回复到历史记录
-      _conversationHistory.add({'role': 'assistant', 'content': response});
-
       _scrollToBottom();
+
+      // 启动流式请求
+      String fullResponse = '';
+      try {
+        await for (String chunk in _deepSeekClient.streamChatCompletion(
+          text,
+          systemMessages: _conversationHistory
+              .where((msg) => msg['role'] == 'system')
+              .toList(),
+        )) {
+          // 添加新收到的文本到流
+          streamController.add(chunk);
+          fullResponse += chunk;
+
+          // 确保滚动到底部，跟随新内容
+          _scrollToBottom();
+        }
+      } finally {
+        await streamController.close();
+      }
+
+      // 请求完成后，保存完整响应到历史记录
+      _conversationHistory.add({'role': 'assistant', 'content': fullResponse});
     } catch (e) {
       if (!mounted) return;
 
